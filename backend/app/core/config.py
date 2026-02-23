@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 
@@ -9,8 +9,8 @@ class Settings(BaseSettings):
     
     # LLM Settings
     LLM_PROVIDER: Literal["openai", "anthropic"] = "openai"
-    OPENAI_API_KEY: str | None = None
-    ANTHROPIC_API_KEY: str | None = None
+    OPENAI_API_KEY: Optional[str] = None
+    ANTHROPIC_API_KEY: Optional[str] = None
     
     # Vector DB
     CHROMA_PERSIST_DIRECTORY: str = "./data/chroma_db"
