@@ -3,7 +3,12 @@ import { Trash2, FileText, CheckSquare, Square, Loader2 } from 'lucide-react';
 import { useChatStore } from '../../store/useChatStore';
 
 export function DocumentList() {
-  const { documents, selectedDocIds, toggleDocumentSelection, removeDocument } = useChatStore();
+  // Safe selector usage
+  const documents = useChatStore((state) => state.documents ?? []);
+  const selectedDocIds = useChatStore((state) => state.selectedDocIds ?? []);
+  const toggleDocumentSelection = useChatStore((state) => state.toggleDocumentSelection);
+  const removeDocument = useChatStore((state) => state.removeDocument);
+  
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const handleDelete = async (docId: string, e: React.MouseEvent) => {
@@ -30,7 +35,8 @@ export function DocumentList() {
     }
   };
 
-  if (documents.length === 0) {
+  // Safe check for length
+  if (!documents || documents.length === 0) {
     return (
       <div className="text-center text-xs text-gray-600 py-8">
         暂无文档，请先上传
@@ -41,7 +47,8 @@ export function DocumentList() {
   return (
     <div className="flex flex-col gap-2">
       {documents.map(doc => {
-        const isSelected = selectedDocIds.includes(doc.id);
+        // Safe check for includes
+        const isSelected = selectedDocIds?.includes(doc.id) ?? false;
         const isDeleting = deletingId === doc.id;
         
         return (

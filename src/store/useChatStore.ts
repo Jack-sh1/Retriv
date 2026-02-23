@@ -1,12 +1,13 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import { Message, Source, Usage } from '../types/index';
+import { Message, Source, Usage, Document } from '../types/index';
 
 // Type definitions
 interface ChatState {
   messages: Message[];
   isStreaming: boolean;
   selectedDocIds: string[];
+  documents: Document[];
   
   // Actions
   sendMessage: (query: string) => Promise<void>;
@@ -17,6 +18,11 @@ interface ChatState {
   clearMessages: () => void;
   setSelectedDocIds: (ids: string[]) => void;
   
+  // Document Management Actions
+  setDocuments: (docs: Document[]) => void;
+  toggleDocumentSelection: (id: string) => void;
+  removeDocument: (id: string) => void;
+  
   // Internal helper for SSE hook
   getMessages: () => Message[];
 }
@@ -25,6 +31,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   isStreaming: false,
   selectedDocIds: [],
+  documents: [], // Ensure initialized as empty array
 
   sendMessage: async (query: string) => {
     // 1. Create User Message
@@ -111,15 +118,28 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   setSelectedDocIds: (ids: string[]) => set({ selectedDocIds: ids }),
   
+  setDocuments: (docs: Document[]) => set({ documents: docs || [] }),
+
+  toggleDocumentSelection: (id: string) => 
+    set((state) => {
+      const current = state.selectedDocIds || [];
+      if (current.includes(id)) {
+        return { selectedDocIds: current.filter(docId => docId !== id) };
+      } else {
+        return { selectedDocIds: [...current, id] };
+      }
+    }),
+
+  removeDocument: (id: string) =>
+    set((state) => ({
+      documents: (state.documents || []).filter(doc => doc.id !== id),
+      selectedDocIds: (state.selectedDocIds || []).filter(docId => docId !== id)
+    })),
+  
   getMessages: () => get().messages,
 }));
 
 // Subscribe to store changes for debugging
 useChatStore.subscribe((state) => {
-  console.log('[Store] state changed, messages count:', state.messages.length);
-  if (state.messages.length > 0) {
-    const lastMsg = state.messages[state.messages.length - 1];
-    // Print last 50 chars of content to verify updates
-    console.log('[Store] Last message content (tail):', lastMsg.content.slice(-50));
-  }
+  // console.log('[Store] state changed, messages count:', state.messages.length);
 });
