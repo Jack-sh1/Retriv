@@ -1,3 +1,9 @@
+import os
+import sys
+
+# Ensure backend directory is in sys.path when running this script directly
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
