@@ -1,0 +1,5 @@
+{
+  "name": "Nexus Knowledge Q&A",
+  "description": "An AI knowledge base Q&A system with document management and streaming responses.",
+  "requestFramePermissions": []
+}
