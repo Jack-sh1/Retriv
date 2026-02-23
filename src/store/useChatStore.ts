@@ -53,11 +53,20 @@ export const useChatStore = create<ChatState>((set) => ({
 
   appendTokenToLastMessage: (token) =>
     set((state) => {
+      console.log('[Store] appendToken:', token);
       const messages = [...state.messages];
-      if (messages.length === 0) return state;
+      if (messages.length === 0) {
+        console.warn('[Store] Messages empty, cannot append token');
+        return state;
+      }
 
       const lastIndex = messages.length - 1;
       const lastMsg = messages[lastIndex];
+      
+      if (lastMsg.role !== 'assistant') {
+        console.warn('[Store] Last message is not assistant, cannot append token');
+        return state;
+      }
       
       messages[lastIndex] = {
         ...lastMsg,
@@ -99,17 +108,19 @@ export const useChatStore = create<ChatState>((set) => ({
 
   addDocument: (doc) => set((state) => ({ documents: [...state.documents, doc] })),
   
-  removeDocument: (id) => set((state) => ({ 
-    documents: state.documents.filter(d => d.id !== id),
-    selectedDocIds: state.selectedDocIds.filter(sid => sid !== id)
-  })),
-  
-  toggleDocumentSelection: (id) => set((state) => {
-    const isSelected = state.selectedDocIds.includes(id);
-    return {
-      selectedDocIds: isSelected 
-        ? state.selectedDocIds.filter(sid => sid !== id)
-        : [...state.selectedDocIds, id]
-    };
-  })
+  removeDocument: (id) =>
+    set((state) => ({
+      documents: state.documents.filter((d) => d.doc_id !== id),
+      selectedDocIds: state.selectedDocIds.filter((tid) => tid !== id),
+    })),
+
+  toggleDocumentSelection: (id) =>
+    set((state) => {
+      const isSelected = state.selectedDocIds.includes(id);
+      return {
+        selectedDocIds: isSelected
+          ? state.selectedDocIds.filter((tid) => tid !== id)
+          : [...state.selectedDocIds, id],
+      };
+    }),
 }));

@@ -58,7 +58,12 @@ async def chat_stream(request: ChatRequest):
             doc_ids=request.doc_ids,
             history=request.history
         ),
-        media_type="text/event-stream"
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        }
     )
 
 @router.get("/health", response_model=HealthResponse)

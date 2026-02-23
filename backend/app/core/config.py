@@ -8,10 +8,9 @@ class Settings(BaseSettings):
     PROJECT_ROOT: str = "."
     
     # LLM Settings
-    LLM_PROVIDER: Literal["openai", "anthropic", "deepseek"] = "openai"
-    EMBEDDING_PROVIDER: Literal["openai", "huggingface"] = "openai"
+    LLM_PROVIDER: Literal["openai", "deepseek"] = "deepseek"
+    EMBEDDING_PROVIDER: Literal["openai", "huggingface"] = "huggingface"
     OPENAI_API_KEY: Optional[str] = None
-    ANTHROPIC_API_KEY: Optional[str] = None
     DEEPSEEK_API_KEY: Optional[str] = None
     
     # Vector DB
