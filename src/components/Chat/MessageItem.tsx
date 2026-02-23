@@ -30,7 +30,7 @@ export function MessageItem({ message }: Props) {
         <div className="flex items-center gap-2 mb-1 px-1">
           <span className="text-xs font-semibold text-gray-400">{isUser ? 'YOU' : 'SYSTEM'}</span>
           <span className="text-[10px] text-gray-600">
-            {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </span>
         </div>
         

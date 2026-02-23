@@ -1,5 +1,6 @@
 import os
 from typing import List, Dict, Any
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.retrievers import BM25Retriever
@@ -11,10 +12,16 @@ settings = get_settings()
 
 class VectorService:
     def __init__(self):
-        self.embeddings = OpenAIEmbeddings(
-            model="text-embedding-3-small",
-            openai_api_key=settings.OPENAI_API_KEY
-        )
+        if settings.EMBEDDING_PROVIDER == "huggingface":
+            self.embeddings = HuggingFaceEmbeddings(
+                model_name="all-MiniLM-L6-v2"
+            )
+        else:
+            self.embeddings = OpenAIEmbeddings(
+                model="text-embedding-3-small",
+                openai_api_key=settings.OPENAI_API_KEY
+            )
+            
         self.vector_store = Chroma(
             collection_name=settings.COLLECTION_NAME,
             embedding_function=self.embeddings,
@@ -75,7 +82,7 @@ class VectorService:
             search_kwargs={"k": k, "filter": filters}
         )
         
-        if self.bm25_retriever:
+        if self.bm25_retriever and not filters:
             self.bm25_retriever.k = k
             # Note: BM25Retriever doesn't support metadata filters natively in LangChain easily
             # We might need to post-filter or just rely on the ensemble

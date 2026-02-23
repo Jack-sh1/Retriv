@@ -13,12 +13,21 @@ settings = get_settings()
 
 class ChatService:
     def __init__(self):
-        self.llm = ChatOpenAI(
-            model="gpt-3.5-turbo", # Or gpt-4o if available
-            temperature=0,
-            streaming=True,
-            openai_api_key=settings.OPENAI_API_KEY
-        )
+        if settings.LLM_PROVIDER == "deepseek":
+            self.llm = ChatOpenAI(
+                model="deepseek-chat",
+                temperature=0,
+                streaming=True,
+                openai_api_key=settings.DEEPSEEK_API_KEY,
+                base_url="https://api.deepseek.com"
+            )
+        else:
+            self.llm = ChatOpenAI(
+                model="gpt-3.5-turbo", # Or gpt-4o if available
+                temperature=0,
+                streaming=True,
+                openai_api_key=settings.OPENAI_API_KEY
+            )
         
         self.prompt = ChatPromptTemplate.from_template("""
         You are a strict AI assistant. Answer the user's question solely based on the provided context.
@@ -58,7 +67,11 @@ class ChatService:
         
         # 4. Stream Sources
         sources = [
-            {"filename": d.metadata.get("filename"), "score": d.metadata.get("score", 0)} 
+            {
+                "text": d.page_content,
+                "score": d.metadata.get("score", 0),
+                "source": d.metadata.get("filename", "unknown")
+            } 
             for d in top_docs
         ]
         yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"

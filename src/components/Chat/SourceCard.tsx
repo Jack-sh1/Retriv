@@ -18,11 +18,11 @@ export function SourceCard({ source }: Props) {
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-1.5 text-xs text-gray-400">
           <FileText className="w-3.5 h-3.5" />
-          <span className="truncate max-w-[200px]">{source.documentName}</span>
+          <span className="truncate max-w-[200px]">{source.source}</span>
         </div>
         <div className="flex items-center gap-1 text-[10px] bg-[#0d0f14] px-1.5 py-0.5 rounded border border-white/5 text-[#f5a623]">
           <Percent className="w-3 h-3" />
-          <span>{(source.similarity * 100).toFixed(1)}%</span>
+          <span>{(source.score * 100).toFixed(1)}%</span>
         </div>
       </div>
       

@@ -1,6 +1,5 @@
 import React from 'react';
-import { MessageList } from './MessageList';
-import { ChatInput } from './ChatInput';
+import { ChatWindow } from './ChatWindow';
 import { useChatStore } from '../../store/useChatStore';
 import { Layers } from 'lucide-react';
 
@@ -9,7 +8,7 @@ export function ChatArea() {
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#0d0f14] font-mono relative">
-      <div className="h-14 border-b border-white/5 flex items-center justify-between px-6 bg-[#13151c]/50 backdrop-blur-sm z-10">
+      <div className="h-14 border-b border-white/5 flex items-center justify-between px-6 bg-[#13151c]/50 backdrop-blur-sm z-10 flex-shrink-0">
         <div className="flex items-center gap-2">
           <Layers className="w-5 h-5 text-[#f5a623]" />
           <h2 className="font-semibold text-gray-100">Nexus Knowledge Q&A</h2>
@@ -32,13 +31,7 @@ export function ChatArea() {
       </div>
       
       <div className="flex-1 overflow-hidden relative">
-        <MessageList />
-      </div>
-      
-      <div className="p-4 border-t border-white/5 bg-[#13151c]">
-        <div className="max-w-4xl mx-auto">
-          <ChatInput />
-        </div>
+        <ChatWindow />
       </div>
     </div>
   );

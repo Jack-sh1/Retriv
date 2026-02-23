@@ -23,9 +23,13 @@ class IngestionService:
         )
 
     def process_file(self, file: UploadFile) -> tuple[str, int]:
-        # Save temp file
-        file_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}_{file.filename}")
+        # 1. Use UUID for filename to avoid encoding issues with non-ASCII characters in file system
+        ext = os.path.splitext(file.filename)[1]
+        safe_filename = f"{uuid.uuid4()}{ext}"
+        file_path = os.path.join(TEMP_DIR, safe_filename)
+        
         try:
+            # Save temp file (binary mode, no encoding needed)
             with open(file_path, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
             
@@ -39,6 +43,8 @@ class IngestionService:
             doc_id = str(uuid.uuid4())
             
             # Add metadata
+            # 4. Ensure metadata is safe. While Chroma supports UTF-8, some environments might trigger encoding errors.
+            # We keep original filename but ensure it's handled if it causes issues.
             for chunk in chunks:
                 chunk.metadata.update({
                     "doc_id": doc_id,
@@ -75,8 +81,10 @@ class IngestionService:
         if ext == ".pdf":
             loader = PyPDFLoader(file_path)
         elif ext == ".md":
-            loader = UnstructuredMarkdownLoader(file_path)
+            # 2/3. Ensure text loaders use UTF-8
+            loader = UnstructuredMarkdownLoader(file_path, mode="single", encoding="utf-8")
         elif ext == ".txt":
+            # 2/3. Ensure text loaders use UTF-8
             loader = TextLoader(file_path, encoding="utf-8")
         else:
             raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")

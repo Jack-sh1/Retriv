@@ -1,63 +1,115 @@
 import { create } from 'zustand';
-import { Document, Message, KBScope } from '../types';
+import { Message, Source, Usage, Document, KBScope } from '../types';
 
-interface ChatStore {
+interface ChatState {
+  // Chat State
   messages: Message[];
-  documents: Document[];
-  selectedDocIds: string[];
   isStreaming: boolean;
+  selectedDocIds: string[];
+  
+  // Knowledge Base State
+  documents: Document[];
   kbScope: KBScope;
   
+  // Chat Actions
   addMessage: (message: Message) => void;
-  updateLastMessage: (content: string, sources?: Message['sources']) => void;
+  updateLastMessage: (updater: (msg: Message) => Message) => void;
+  appendTokenToLastMessage: (token: string) => void;
+  setLastMessageSources: (sources: Source[]) => void;
+  setLastMessageUsage: (usage: Usage) => void;
   setStreaming: (isStreaming: boolean) => void;
-  
+  setSelectedDocIds: (ids: string[]) => void;
+  clearMessages: () => void;
+
+  // Knowledge Base Actions
+  setKBScope: (scope: KBScope) => void;
+  setDocuments: (docs: Document[]) => void;
   addDocument: (doc: Document) => void;
   removeDocument: (id: string) => void;
   toggleDocumentSelection: (id: string) => void;
-  
-  setKBScope: (scope: KBScope) => void;
 }
 
-export const useChatStore = create<ChatStore>((set) => ({
+export const useChatStore = create<ChatState>((set) => ({
+  // Initial State
   messages: [],
-  documents: [],
-  selectedDocIds: [],
   isStreaming: false,
+  selectedDocIds: [],
+  documents: [],
   kbScope: 'all',
-  
-  addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
-  
-  updateLastMessage: (content, sources) => set((state) => {
-    const newMessages = [...state.messages];
-    if (newMessages.length > 0) {
-      const lastIdx = newMessages.length - 1;
-      newMessages[lastIdx] = {
-        ...newMessages[lastIdx],
-        content: newMessages[lastIdx].content + content,
-        sources: sources || newMessages[lastIdx].sources,
+
+  // Chat Actions Implementation
+  addMessage: (message) =>
+    set((state) => ({ messages: [...state.messages, message] })),
+
+  updateLastMessage: (updater) =>
+    set((state) => {
+      const messages = [...state.messages];
+      if (messages.length === 0) return state;
+      
+      const lastIndex = messages.length - 1;
+      messages[lastIndex] = updater(messages[lastIndex]);
+      return { messages };
+    }),
+
+  appendTokenToLastMessage: (token) =>
+    set((state) => {
+      const messages = [...state.messages];
+      if (messages.length === 0) return state;
+
+      const lastIndex = messages.length - 1;
+      const lastMsg = messages[lastIndex];
+      
+      messages[lastIndex] = {
+        ...lastMsg,
+        content: lastMsg.content + token,
       };
-    }
-    return { messages: newMessages };
-  }),
-  
+      return { messages };
+    }),
+
+  setLastMessageSources: (sources) =>
+    set((state) => {
+      const messages = [...state.messages];
+      if (messages.length === 0) return state;
+
+      const lastIndex = messages.length - 1;
+      messages[lastIndex] = { ...messages[lastIndex], sources };
+      return { messages };
+    }),
+
+  setLastMessageUsage: (usage) =>
+    set((state) => {
+      const messages = [...state.messages];
+      if (messages.length === 0) return state;
+
+      const lastIndex = messages.length - 1;
+      messages[lastIndex] = { ...messages[lastIndex], usage };
+      return { messages };
+    }),
+
   setStreaming: (isStreaming) => set({ isStreaming }),
   
-  addDocument: (doc) => set((state) => ({ 
-    documents: [...state.documents, doc],
-    selectedDocIds: [...state.selectedDocIds, doc.id]
-  })),
+  setSelectedDocIds: (ids) => set({ selectedDocIds: ids }),
   
-  removeDocument: (id) => set((state) => ({
+  clearMessages: () => set({ messages: [] }),
+
+  // Knowledge Base Actions Implementation
+  setKBScope: (scope) => set({ kbScope: scope }),
+  
+  setDocuments: (docs) => set({ documents: docs }),
+
+  addDocument: (doc) => set((state) => ({ documents: [...state.documents, doc] })),
+  
+  removeDocument: (id) => set((state) => ({ 
     documents: state.documents.filter(d => d.id !== id),
-    selectedDocIds: state.selectedDocIds.filter(docId => docId !== id)
+    selectedDocIds: state.selectedDocIds.filter(sid => sid !== id)
   })),
   
-  toggleDocumentSelection: (id) => set((state) => ({
-    selectedDocIds: state.selectedDocIds.includes(id)
-      ? state.selectedDocIds.filter(docId => docId !== id)
-      : [...state.selectedDocIds, id]
-  })),
-  
-  setKBScope: (kbScope) => set({ kbScope }),
+  toggleDocumentSelection: (id) => set((state) => {
+    const isSelected = state.selectedDocIds.includes(id);
+    return {
+      selectedDocIds: isSelected 
+        ? state.selectedDocIds.filter(sid => sid !== id)
+        : [...state.selectedDocIds, id]
+    };
+  })
 }));

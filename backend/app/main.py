@@ -5,7 +5,8 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
 from app.api.endpoints import router as api_router
@@ -29,6 +30,14 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     lifespan=lifespan
 )
+
+# Global Exception Handler for Unicode issues
+@app.exception_handler(UnicodeEncodeError)
+async def unicode_exception_handler(request: Request, exc: UnicodeEncodeError):
+    return JSONResponse(
+        status_code=400,
+        content={"detail": "File encoding error. Please ensure filenames and content are UTF-8 compatible or try renaming the file."},
+    )
 
 # CORS
 origins = [
