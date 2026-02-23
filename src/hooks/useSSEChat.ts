@@ -1,34 +1,29 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
-import { Source, Usage, Message } from '../types/index';
+import { useRef, useCallback, useEffect } from 'react';
+import { useChatStore } from '../store/useChatStore';
 
-interface UseChatOptions {
-  onToken: (token: string) => void;
-  onSources: (sources: Source[]) => void;
-  onDone: (usage: Usage) => void;
-  onError: (msg: string) => void;
-}
-
-export function useSSEChat(options: UseChatOptions) {
-  const [isStreaming, setIsStreaming] = useState(false);
+export function useSSEChat() {
   const abortControllerRef = useRef<AbortController | null>(null);
   
-  // Use a ref to keep track of the latest options to avoid stale closures
-  const optionsRef = useRef(options);
-  
-  // Update options ref whenever options change
-  useEffect(() => {
-    optionsRef.current = options;
-  }, [options]);
+  // Access store actions directly
+  const { 
+    appendToken, 
+    setMessageSources, 
+    setDone, 
+    setStreaming, 
+    getMessages,
+    selectedDocIds 
+  } = useChatStore();
 
   const abort = useCallback(() => {
     if (abortControllerRef.current) {
+      console.log('[SSE] Aborting request...');
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
-    setIsStreaming(false);
-  }, []);
+    setStreaming(false);
+  }, [setStreaming]);
 
-  const send = useCallback(async (query: string, docIds: string[], history: Message[]) => {
+  const send = useCallback(async (query: string) => {
     // Cancel any previous request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -36,10 +31,21 @@ export function useSSEChat(options: UseChatOptions) {
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
-    setIsStreaming(true);
 
     try {
-      console.log('[SSE] Starting request...');
+      // Get current history from store (excluding the last placeholder if needed, 
+      // but backend usually handles it. Here we send all previous messages minus the current query/placeholder pair
+      // actually, let's just send what we have. Ideally backend filters.
+      // For simplicity, let's filter out the last two messages we just added (User + Placeholder)
+      // to avoid duplication if backend appends user query again.
+      // BUT: The standard pattern is: Frontend adds to UI -> Frontend sends Query + History -> Backend returns Answer.
+      // So history should be messages.slice(0, -2).
+      const allMessages = getMessages();
+      const history = allMessages.slice(0, -2).map(({ role, content }) => ({ role, content }));
+      
+      console.log('[SSE] Sending request. Query:', query);
+      console.log('[SSE] History length:', history.length);
+
       const response = await fetch('http://localhost:8000/api/chat/stream', {
         method: 'POST',
         headers: {
@@ -47,14 +53,11 @@ export function useSSEChat(options: UseChatOptions) {
         },
         body: JSON.stringify({
           query,
-          doc_ids: docIds,
-          history: history.map(({ role, content }) => ({ role, content })),
+          doc_ids: selectedDocIds,
+          history,
         }),
         signal: controller.signal,
       });
-
-      console.log('[SSE] Response status:', response.status);
-      console.log('[SSE] Response headers:', response.headers.get('content-type'));
 
       if (!response.ok) {
         throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
@@ -65,22 +68,19 @@ export function useSSEChat(options: UseChatOptions) {
       }
 
       const reader = response.body.getReader();
-      console.log('[SSE] Reader created:', reader);
-      
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
-        console.log('[SSE] Chunk received. Done:', done, 'Value length:', value?.length);
         
         if (done) {
+            console.log('[SSE] Stream complete');
             break;
         }
         
         // Append new chunk to buffer
         buffer += decoder.decode(value, { stream: true });
-        console.log('[SSE] Buffer content:', buffer);
         
         // Split buffer by newlines to process complete lines
         const lines = buffer.split('\n');
@@ -90,42 +90,52 @@ export function useSSEChat(options: UseChatOptions) {
 
         for (const line of lines) {
           const trimmedLine = line.trim();
-          console.log('[SSE] Processing line:', trimmedLine);
-          
           if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
 
           const dataStr = trimmedLine.slice(6);
           try {
             const data = JSON.parse(dataStr);
-            console.log('[SSE] Parsed data:', data);
 
             if (data.type === 'token') {
-              optionsRef.current.onToken(data.content);
+              // console.log('[SSE] Token:', data.content); // Too noisy
+              appendToken(data.content);
             } else if (data.type === 'sources') {
-              optionsRef.current.onSources(data.sources);
+              console.log('[SSE] Sources:', data.sources);
+              setMessageSources(data.sources);
             } else if (data.type === 'done') {
-              optionsRef.current.onDone(data.usage || { input_tokens: 0, output_tokens: 0 });
+              console.log('[SSE] Done. Usage:', data.usage);
+              setDone(data.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 });
             } else if (data.type === 'error') {
-               throw new Error(data.message);
+               console.error('[SSE] Server Error:', data.message);
+               appendToken(`\n\n**Error:** ${data.message}`);
+               setStreaming(false);
             }
           } catch (e) {
-             console.error('Failed to parse SSE message:', e);
-             // Continue processing other lines
+             console.error('[SSE] Failed to parse message:', e, 'Line:', line);
           }
         }
       }
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        console.log('Request aborted');
+        console.log('[SSE] Request aborted by user');
       } else {
-        console.error('SSE Error:', error);
-        optionsRef.current.onError(error.message);
+        console.error('[SSE] Network/Logic Error:', error);
+        appendToken(`\n\n**Connection Error:** ${error.message}`);
       }
+      setStreaming(false);
     } finally {
-      setIsStreaming(false);
       abortControllerRef.current = null;
     }
+  }, [appendToken, setMessageSources, setDone, setStreaming, getMessages, selectedDocIds]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, []);
 
-  return { send, abort, isStreaming };
+  return { send, abort };
 }

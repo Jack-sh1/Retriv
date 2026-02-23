@@ -1,30 +1,22 @@
 import { useRef, useEffect, useState, KeyboardEvent, ChangeEvent } from 'react';
 import { useChatStore } from '../../store/useChatStore';
 import { useSSEChat } from '../../hooks/useSSEChat';
-import { Message } from '../../types';
 import { MessageItem } from './MessageItem';
 
 export const ChatWindow = () => {
-  const { 
-    messages, 
-    addMessage, 
-    appendTokenToLastMessage, 
-    setLastMessageSources, 
-    setLastMessageUsage, 
-    selectedDocIds,
-    setStreaming 
-  } = useChatStore();
-  
-  console.log('[ChatWindow] Render. Messages count:', messages.length);
-  if (messages.length === 0) {
-    console.log('[ChatWindow] Messages empty');
-  } else {
-    console.log('[ChatWindow] Last message:', messages[messages.length - 1]);
-  }
+  // Selector-based subscription for performance and stability
+  const messages = useChatStore((state) => state.messages);
+  const isStreaming = useChatStore((state) => state.isStreaming);
+  const sendMessage = useChatStore((state) => state.sendMessage);
   
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Custom SSE hook
+  const { send, abort } = useSSEChat();
+
+  console.log('[ChatWindow] Render. Messages count:', messages.length);
 
   // Auto-scroll to bottom
   const scrollToBottom = () => {
@@ -33,67 +25,24 @@ export const ChatWindow = () => {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
-
-  // SSE Hook
-  const { send, abort, isStreaming } = useSSEChat({
-    onToken: (token) => {
-      appendTokenToLastMessage(token);
-    },
-    onSources: (sources) => {
-      setLastMessageSources(sources);
-    },
-    onDone: (usage) => {
-      setLastMessageUsage(usage);
-    },
-    onError: (msg) => {
-      appendTokenToLastMessage(`\n\n**Error:** ${msg}`);
-    }
-  });
-
-  // Sync streaming state to store
-  useEffect(() => {
-    setStreaming(isStreaming);
-  }, [isStreaming, setStreaming]);
+  }, [messages.length, messages[messages.length - 1]?.content]); // Scroll on new message or content change
 
   const handleSend = async () => {
     if (!input.trim() || isStreaming) return;
 
-    const currentInput = input.trim();
-    const userMsg: Message = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: currentInput,
-      createdAt: new Date(),
-    };
-
-    const assistantMsg: Message = {
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      content: '', // Start empty
-      createdAt: new Date(),
-    };
-
-    // Optimistic update
-    console.log('[ChatWindow] Adding messages:', userMsg, assistantMsg);
-    addMessage(userMsg);
-    addMessage(assistantMsg);
+    const query = input.trim();
     setInput('');
     
     // Reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-
-    // Trigger API
-    // Pass the NEW messages list including the optimistic updates
-    const newMessages = [...messages, userMsg, assistantMsg]; 
-    // Note: 'assistantMsg' is empty, so it won't affect history context much, 
-    // but usually we exclude the last empty assistant message from history sent to API.
-    // The previous implementation was: [...messages, userMsg]
     
-    console.log('[ChatWindow] Sending request with history length:', newMessages.length);
-    await send(currentInput, selectedDocIds, [...messages, userMsg]);
+    // 1. Update Store (Optimistic)
+    await sendMessage(query);
+    
+    // 2. Start Streaming
+    await send(query);
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
